@@ -3,6 +3,7 @@
 \settopmatter{printfolios=true,printccs=false,printacmref=false}
 
 \input{preamble}
+\input{macros}
 
 \begin{document}
 \title{Approximating Type Stability in the Julia JIT}
@@ -10,6 +11,179 @@
 
 \maketitle
 
+\section{Introduction}
 
-Ping
+The scientific computing community has long been of two minds about the language
+technology best suited for the task. On the one hand, the exploratory nature of
+programming with raw datasets and mathematical models with many parameters calls
+for modern convenience features like dynamic typing and garbage collection. On
+the other, crunching numbers may require to squeeze every CPU cycle available.
+Accordingly, the language market in this area is split into productivity
+languages (Python, MATLAB, R) and high-performance oriented languages (C,
+C++, Fortran).
+
+The splitted nature of the language landscape in the area of scientific
+computing calls for a question: can we have the best of both worlds? Julia
+attempts to answer in the positive.
+
+On the surface, the Juila language has a lot of pythonistic feeling to it.
+Consider the following function that sums an array of elements but clamps the
+summands above the given threshold.
+%
+\begin{verbatim}
+  function sum(v, t)
+    res = v[1]
+    for i = 2:length(v)
+      elm  = v[i] < t ? v[i] : t
+      res = res + elm
+    end
+    res
+  end
+\end{verbatim}
+%
+What strikes about this code is the absence of type annotations either on the
+function arguments or anywhere locally. Of course, it is possible to call
+\c{sum} with a string and a number and get a runtime failure. On the other hand,
+and no less of a surprise, when called with the right arguments the code gets
+JIT-compiled and performs on par with equivalent C code.
+
+Julia's competitive performance is documented both in the language manual and in
+academic papers~\cite{oopsla18a}. One of the key techniques enabling
+essential optimizations is based on the code property called \emph{type
+stability}~\cite{Pelenitsyn21}. While well-understood on the IR level, the
+property has been elusive for end users: it is mentioned in the manual and on
+many forum threads but still does not have a clear source-level model for it.
+In this short paper we propose the first algorithm to approximate this highly
+dynamic property statically. In particular, we
+\begin{itemize}
+
+  \item give an informal description of type stability as it comes up in
+  practice of Julia programming (\secref{sec:back}; largely following~\cite{Pelenitsyn21});
+
+  \item discuss challenges to model type stability statically and the relation
+  of the task to the full-fledged type inference;
+
+  \item give an algorithm to approximate type stability statically;
+
+  \item discuss termination conditions of the algorithm, and an approach for
+  evaluating it.
+\end{itemize}
+
+% \section{A Typeful Language in The Untyped Universe}%
+\section{A Type Stability Primer}%
+% \section{Julia: Productivity And Performance Reconciled}
+\label{sec:back}
+
+\subsection{Multiple Dispatch in Julia}%
+
+The Julia language is designed around multiple dispatch~\cite{BezansonEKS17}.
+Programs consist of \emph{functions} that are implemented by multiple
+\emph{methods}; there is nothing more to a Julia function than just a name. Each
+method is identified by a distinct type signature. At run time, the Julia
+implementation dispatches a function call to the \emph{most specific} method by
+comparing the types of the arguments to the types of the parameters of all
+methods of that function. For example, the call to the \c{+} function in the
+example from the introduction can dispatch to one out of over two hundreds
+methods for \c{+} in the standard library alone (packages can add more methods
+to a function). % TODO: \figref{fig:plus}.
+
+% TODO: figure how to make figure* work...
+% \begin{figure*}
+% \begin{lstlisting}[language=julia]
+% # 184 methods for generic function "+":
+% [1] +(x::T, y::T) where T<:Union{Int128, Int16, Int32, Int64, Int8, UInt128, UInt16, UInt32, UInt64, UInt8} in Base at int.jl:87
+% [2] +(x::T, y::T) where T<:Union{Float16, Float32, Float64} in Base at float.jl:383[3] +(::Missing) in Base at missing.jl:100
+% ...
+% \end{lstlisting}
+% \caption{Methods from the standard library}\label{plus}\label{fig:plus}
+% \Description{Several of 206 methods for the \c{+} function in the Julia standard
+%   library as of Julia 1.8.5}
+% \end{figure*}
+
+
+Julia supports a rich type language for defining method signatures. Base types
+consist of either bits types (i.e. types with a direct binary representation,
+like integers) or record types (called structs in Julia). Both bits types and
+record types, referred to as \emph{concrete types}, can have supertypes, but all
+supertypes are \emph{abstract types}. Abstract types are arranged into a
+subtyping hierarchy rooted at the built-in \c{Any} type. Every value in the
+program have a unique type tag that can be accessed via the \c{typeof} funciton.
+%
+The type language allows for further composition of these base
+types using unions, tuples, and bounded existential constructors; the result of
+composition can be abstract or concrete. \citet{oopsla18b} gives a detailed
+discussion of the type language and of subtyping.
+
+Any function call in a program, such as \c{res+elm} in the example above,
+requires choosing one of the methods of the target function. \emph{Method
+dispatch} is a multi-step process. First, the implementation obtains the
+concrete types of arguments. Second, it retrieves applicable methods by checking
+for subtyping between argument types and type annotations of the methods. Next,
+it sorts these methods into subtype order. Finally, the call is dispatched to
+the most specific method---a method such that no other applicable method is its
+strict subtype. If no such method exists, an error is produced.
+
+Function calls are pervasive in Julia, and their efficiency is crucial for
+performance. However, the multi-step dispatch mechanism
+make the process slow. To attain acceptable performance, the compiler attempts
+to remove as many dispatch operations as it can. This optimization leverages
+run-time type information whenever a method is compiled, i.e., when it is called
+for the first time with a novel set of argument types.  These types are used by
+the compiler to infer types in the method body. Then, this type information
+frequently allows the compiler to devirtualize and inline the function calls
+within a method~\cite{aigner}, thus improving performance. However, this
+optimization is not always possible: if type inference cannot produce a
+sufficiently specific type, then the call cannot be devirtualized.
+
+\subsection{Type Stability: A Key To Performance?}
+
+To illustrate a profound effect that type inference precision can have on
+performance, consider the \c{sum} function from the introduction benchmarked in
+three scenarios differing only in input types. Assuming a random array of integers
+called \c{vint} and a random array of floating-point numbers called \c{vflt}
+(both consisting of 10K elements)
+compare the median running time of the following three calls to \c{sum}:
+\begin{itemize}
+
+  \item \c{sum(vint, 0)}~--- 1.397 microseconds
+  \item \c{sum(vflt, 0.5)}~--- 11.489 microseconds
+  \item \c{sum(vint, 0.5)}~--- 64.623 microseconds
+\end{itemize}
+
+When a performance regression occurs, it is common for Julia developers to study
+the intermediate representation produced by the compiler. To facilitate this,
+the language provides a macro, \c{@code_warntype}, that shows Julia's
+intermediate representation of the code along with the inferred types for a given function
+invocation. Types that are imprecise, i.e. abstract, show up in red: they
+indicate that concrete type of a run-time value may vary from run to run.
+%
+In the first two benchmarks, the Julia compiler is able to deduce a concrete return
+type of the method (\c{Int} and \c{Float} correspondingly), but the type of the last one
+reported as \c{Union\{Int, Float\}}, which is an abstract type.
+%
+Such type imprecision can impact performance in two ways. First,
+the \c{res} variable has to be boxed, adding a level of indirection to
+any operation performed therein. Second, it is harder for
+the compiler to devirtualize and inline consecutive calls, thus requiring
+dynamic dispatch.
+
+Julia's compilation model is designed to accommodate source programs
+with flexible types. Yet, to make such programs efficient, the compiler
+creates an \emph{instance} of each source method for each distinct tuple of
+argument types. Thus, even if the programmer does not provide any type
+annotations, like in the \c{sum} example, the compiler will create method
+instances for \emph{concrete} input types seen during
+an execution. For example, the three benchmarks shown above will make the
+compiler create three distinct method instances.
+Because method instances have more precise argument types, the compiler can
+leverage them to produce more efficient code and infer more precise return types.
+
+In Julia parlance, a method is called \emph{type stable} if, given a concrete
+input type, it is possible to infer a concrete output type. The \c{sum} function
+is not type stable because for the input type \c{Tuple\{Vector\{Int\},
+Float64\}}\footnote{Tuple types encode several input arguments in Julia.}
+the return type can be either \c{Int} or \c{Float64}.
+
+\bibliography{bib/jv,bib/all,bib/lj}
+
 \end{document}
