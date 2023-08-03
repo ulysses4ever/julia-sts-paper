@@ -1,4 +1,4 @@
-\documentclass[sigplan,review]{acmart}
+\documentclass[sigplan,review,anonymous]{acmart}
 
 \settopmatter{printfolios=true,printccs=false,printacmref=false}
 
@@ -6,7 +6,7 @@
 \input{macros}
 
 \begin{document}
-\title{Approximating Type Stability in the Julia JIT}
+\title[Approximating Type Stability in the Julia JIT (work in progress)]{Approximating Type Stability in the Julia JIT\\(work in progress)}
 \input{metadata}
 
 \maketitle
@@ -61,12 +61,12 @@ dynamic property statically. In particular, we
   practice of Julia programming (\secref{sec:back}; largely following~\cite{Pelenitsyn21});
 
   \item discuss challenges to model type stability statically and the relation
-  of the task to the full-fledged type inference;
+  of the task to the full-fledged type inference (\secref{sec:arrive});
 
-  \item give an algorithm to approximate type stability statically;
+  \item give an algorithm to approximate type stability statically (\secref{sec:algo});
 
-  \item discuss termination conditions of the algorithm, and an approach for
-  evaluating it.
+  \item remark on implementation (\secref{sec:impl}) and
+  evaluation of the algorithm (\secref{sec:eval}) --- both work in progress.
 \end{itemize}
 
 % \section{A Typeful Language in The Untyped Universe}%
@@ -152,7 +152,7 @@ compare the median running time of the following three calls to \c{sum}:
 
 When a performance regression occurs, it is common for Julia developers to study
 the intermediate representation produced by the compiler. To facilitate this,
-the language provides a macro, \c{@code_warntype}, that shows Julia's
+the language provides a utilty, \c{code_warntype}, that shows Julia's
 intermediate representation of the code along with the inferred types for a given function
 invocation. Types that are imprecise, i.e. abstract, show up in red: they
 indicate that concrete type of a run-time value may vary from run to run.
@@ -183,6 +183,241 @@ input type, it is possible to infer a concrete output type. The \c{sum} function
 is not type stable because for the input type \c{Tuple\{Vector\{Int\},
 Float64\}}\footnote{Tuple types encode several input arguments in Julia.}
 the return type can be either \c{Int} or \c{Float64}.
+
+\citet{Pelenitsyn21} formalize type stability as it
+relates to program \emph{execution} by building a formal model of a
+type-specializing just-in-time compiler that does its main job at the run time.
+In this work, we set to approximate the property of type stability for
+arbitrary Julia code statically, without running the code in question.
+
+%\section{Approximating Type Stability Statically}\label{chap:approx}
+\section{Inferring Type Stability Versus Inferring Types}%
+\label{sec:arrive}
+% \section{Inferring Types(tability)} ha-ha
+
+A natural idea for inferring type stability in Julia would be to formulate it as
+a forward static analysis: being an abstract or concrete type is one bit of
+information that has a known value at the input (concrete) and should be
+propagated to the output, possibly changing on the way.
+
+To test the static analysis idea, consider a positive example first: the
+identity function.
+\begin{verbatim}
+  function id(x)
+    x
+  end
+\end{verbatim}
+%
+It is straightforward to infer that, given any concrete input type, the return
+value is also concretely typed: the one bit of information carries over to the
+result in one step.
+
+Another example, the increment function, shows that the task becomes unwieldy fast.
+%
+\begin{verbatim}
+  function inc(x)
+    x + 1
+  end
+\end{verbatim}
+%
+Concreteness of the result returned by \c{inc} depends on the same property of
+the result of the call to \c{+}. In turn, the property of the return type of
+\c{+} depends on which \c{+} method Julia will dispatch to at the run time.
+There are about two hundreds method implementations of \c{+} in the standard
+library alone, and packages add more. Some of those methods are type stable
+(e.g. \c{+(::Int64,::Int64)}), and some of them not (e.g.
+\lstinline|+(::Rational{Bool},::Rational{Bool}|)
+% \footnote{%
+%   The reason for the
+%   \c{+(::Rational\{Bool\},::Rational\{Bool\})} method to be not type
+%   stable is not important, but in the nutshell, Julia has made a questionable
+%   design decision about the return type of \c{{+}(::Bool,::Bool)}, which in the
+%   current implementation is \c{Int}
+%   (see discussion \url{https://github.com/JuliaLang/julia/issues/19168}),
+%   and when adding two rational numbers with boolean components, depending on the
+%   values of the summands, you get back either \c{Rational\{Bool\}} or
+%   \c{Rational\{Int\}}.}
+).
+Therefore,
+to infer the property of interest, in general,
+we need to predict which methods are selected at the run time.
+
+The \c{inc} example shows that inferring type stability of Julia code
+requires
+reasoning about which methods will be called to at the run time, which, in a
+language with dynamic dispatch, leads
+to reasoning about the \emph{types} of intermediate values, rather than only
+the concreteness bit. But if we had a tool to compute typing information
+beforehand, we would not need to build a special purpose analysis for type
+stability: it suffices to ask the tool to tell the type of the return value and
+check if that type is concrete. The observation of interactions between type
+stability and type inference can be formulated as the following conjecture.
+
+\begin{conjecture}
+Inferring type stability of a Julia method statically is no easier than doing type
+inference over that method.
+\end{conjecture}
+
+A full type inference algorithm would be enough for checking type stability of
+Julia code. Should we build one from scratch? There are two reasons to do
+otherwise.
+\begin{enumerate}
+
+  \item It is not clear that typing Julia as is can yield any meaningful result
+  (more on this see~\cite{Chung23}).
+
+  \item Julia already has a type inference engine built in. It was modeled
+        as a black box in~\cite{Pelenitsyn21}. If we end up with a
+        custom algorithm to infer types and analyze type stability based on it,
+        our results may diverge from Julia's.
+\end{enumerate}
+
+\section{An Algorithm To Approximate Type Stability}%
+\label{sec:algo}
+
+If our predictions for type stability are to align with the Julia
+implementation, our analysis should closely model what happens at the run time,
+as described in~\cite{Pelenitsyn21}. The type-specializing JIT-compiler
+from~\cite{Pelenitsyn21} makes optimization decisions based on \emph{concrete
+  input types} with the help of Juila's type inference engine. Our algorithm for
+approximating these decisions statically considers all (or as many as
+possible) allowed concrete input types of a method ---~\figref{fig:infer-ts}.
+
+\input{figs/infer-ts.tex}
+
+Let us consider every step of the algorithm described
+on~\figref{fig:infer-ts} and show its meaning using an example.
+The list below also assigns the numbers to each step in our
+\begin{enumerate}
+
+  \item The input of the algorithm is a Julia method. Methods in Julia are
+  represented by runtime objects of type \c{Method} and can be manipulated as
+  all other objects (e.g. stored in collections, responding to field accesses, etc.).
+
+  For example, consider the \c{length} from the Julia's standard library. We can
+  get the corresponding \c{Method} object using the standard \c{@which} macro
+  applied to an application of the \c{length} method. This can be done in the
+  Julia REPL (signified by the \texttt{julia>} prefix).
+\begin{verbatim}
+  julia> @which length([1,2,3])
+  length(a::Array) in Base at array.jl:215
+\end{verbatim}
+
+  The output shows that the given \c{length}-call will dispatch to the
+  method defined in the \texttt{Base} module (Julia-speak for the standard
+  library). The output also shows the location of the method in the
+  standard library and, most importantly for us, the signature of the
+  method. In fact, what we see here is a pretty-printed representation of
+  the \c{Method} object representing a particular Julia method.
+
+  \item The first task of the algorithm is to get the input type of the given
+  method. This is possible through querying the \c{sig} field of the method object.
+
+  Building on the example above, we can get the signature of the \c{length}
+  method as follows:
+\begin{verbatim}
+  julia> m = @which length([1,2,3]);
+
+  julia> m.sig
+  Tuple{typeof(length), Array}
+\end{verbatim}
+
+  A signature of a method will usually have the special singleton function
+  type (\c{typeof(...)}) as the first component, and the rest is (easy to
+  convert to) the type of the input --- an $n$-tuple. In this example, the type of
+  the input is 1-tuple, consisting of the existential array type
+  \c{Array\{T, N\}\ where T where N} abbreviated simply as \c{Array}.
+
+  \item The input type can be either concrete, which, in Julia, means there may
+  be no proper subtypes of that type, or abstract. Still, the choice on the
+  step 3 will enter the loop at least once, because if the input type is
+  concrete, the check holds once trivially (e.g.\ there is exactly one concrete
+  subtype of the concrete type \c{Int} --- it is \c{Int} itself).
+
+  If the input type is abstract, we need a subprocess enumerating all concrete
+  subtypes of it. We discuss an implementation for this below but it suffices to
+  treat is as a black box for now. % TODO: ref to subtyping section?
+
+  In the case of the \c{length} method, the input type, \c{Array}, is abstract
+  because it is an existential type.
+
+  \item Running type inference for a given method and a given concrete input
+  type is done through calling the Julia's standard \c{code\_typed} function.
+  The only issue with the function is that it expects a function object as the
+  part of the input, not a method object. But getting from a method to the
+  corresponding function is possible using the signature field discussed above,
+  and, in particular, the singleton function type living in the first component
+  of the \c{sig} field: accessing the single function object using the function
+  type is possible via the \c{instance} field.
+
+  Running type inference for the \c{length} method and the concrete input type
+  \c{Array\{1, Float64\}} could be done as follows:
+% \begin{minipage}{.9\textwidth}
+% \begin{lstlisting}[style=jterm]
+\begin{verbatim}
+  julia> code_typed(m.sig.parameters[1]
+                     .instance,
+                    (Array{1, Float64},),
+                    optimize=false)
+  1-element Vector{Any}:
+  CodeInfo(
+  1 - %1 = Base.arraylen(a)::Int64
+  +--      return %1
+  ) => Int64
+\end{verbatim}
+% \end{lstlisting}
+% \end{minipage}
+
+  \item In the running example and for the input type \c{Array\{1, Float64\}}
+  the type inferencer is able to deduce that the return type of \c{length}
+  called with the given input type is \c{Int64}, which is a concrete type
+  according to the standard Julia's \c{isconcretetype} predicate.
+  Following the second decision element on \figref{fig:infer-ts}, we get back to
+  the start of the loop and try another concrete subtype of the input type.
+\end{enumerate}
+
+\section{Implementation}%
+\label{sec:impl}
+
+The first practical consideration of the algorithm as shown is termination. It
+is clear that the algorithm does not terminate for some inputs. Consider the
+\c{length} example: its input type is the existential \c{Array} type, which
+means that possible concrete input types may be:
+\begin{itemize}
+
+  \item \c{Array\{1, Int\}}
+  \item \c{Array\{1, Array\{1, Int\}\}}
+  \item \c{Array\{1, Array\{1, Array\{1, Int\}\}\}}
+  \item etc.
+\end{itemize}
+
+The issue of termination is close to another one: a search space blow up.
+In the standard library alone, there are over five hundreds immediate subtypes
+of \c{Any} and every concrete subtype of those can be use to instantiate the
+\c{Array} type when inferring stability of \c{length}. Although finite, this
+space can be simply too large to exhaust in a reasonable time.
+
+Our intention is to develop certain heuristics to perform an early termination
+of the algorithm. The simplest heuristic of this sort is to employ a fuel
+parameter that gives an arbitrary upper bound for the number of steps we are
+allowed to perform before we give up.
+
+Another implementation concern is step 3 where we need to generate a concrete
+suptype of the input type. Although, there is no built-in facility for this
+task, Julia allows getting immediate subtypes of a given type using the
+\c{subtypes} method. As our current implementation shows, with enough care, it
+is not hard to enumerate concrete subtypes applying the \c{subtypes} method
+iteratively.
+
+\section{Evaluation}%
+\label{sec:eval}
+
+\citet{Pelenitsyn21} analyzed type stability of a corpus of open-source Juila
+packages dynamically via executing test suites of the packages and inspecting the
+resulting method instances collected from the internal state of the virtual
+machine. We propose to run our algorithm for statically inferring type stability
+over the same packages and match the results.
+
 
 \bibliography{bib/jv,bib/all,bib/lj}
 
