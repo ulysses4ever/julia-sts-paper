@@ -85,20 +85,20 @@ comparing the types of the arguments to the types of the parameters of all
 methods of that function. For example, the call to the \c{+} function in the
 example from the introduction can dispatch to one out of over two hundreds
 methods for \c{+} in the standard library alone (packages can add more methods
-to a function). % TODO: \figref{fig:plus}.
+to a function), see \figref{fig:plus} for signatures of some of those methods.
 
 % TODO: figure how to make figure* work...
-% \begin{figure*}
-% \begin{lstlisting}[language=julia]
-% # 184 methods for generic function "+":
-% [1] +(x::T, y::T) where T<:Union{Int128, Int16, Int32, Int64, Int8, UInt128, UInt16, UInt32, UInt64, UInt8} in Base at int.jl:87
-% [2] +(x::T, y::T) where T<:Union{Float16, Float32, Float64} in Base at float.jl:383[3] +(::Missing) in Base at missing.jl:100
-% ...
-% \end{lstlisting}
-% \caption{Methods from the standard library}\label{plus}\label{fig:plus}
-% \Description{Several of 206 methods for the \c{+} function in the Julia standard
-%   library as of Julia 1.8.5}
-% \end{figure*}
+\begin{figure*}
+\begin{lstlisting}[language=julia]
+# 184 methods for generic function "+":
+[1] +(x::T, y::T) where T<:Union{Int128, Int16, Int32, Int64, Int8, UInt128, UInt16, UInt32, UInt64, UInt8} in Base at int.jl:87
+[2] +(x::T, y::T) where T<:Union{Float16, Float32, Float64} in Base at float.jl:383[3] +(::Missing) in Base at missing.jl:100
+...
+\end{lstlisting}
+\caption{Methods from the standard library}\label{plus}\label{fig:plus}
+\Description{Several of 206 methods for the \c{+} function in the Julia standard
+  library as of Julia 1.8.5}
+\end{figure*}
 
 
 Julia supports a rich type language for defining method signatures. Base types
