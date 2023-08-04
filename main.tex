@@ -287,14 +287,14 @@ possible) allowed concrete input types of a method ---~\figref{fig:infer-ts}.
 
 Let us consider every step of the algorithm described
 on~\figref{fig:infer-ts} and show its meaning using an example.
-The list below also assigns the numbers to each step in our
+The list below also assigns the numbers to each step in our algorithm.
 \begin{enumerate}
 
   \item The input of the algorithm is a Julia method. Methods in Julia are
   represented by runtime objects of type \c{Method} and can be manipulated as
   all other objects (e.g. stored in collections, responding to field accesses, etc.).
 
-  For example, consider the \c{length} from the Julia's standard library. We can
+  For example, consider the \c{length} method from the Julia's standard library. We can
   get the corresponding \c{Method} object using the standard \c{@which} macro
   applied to an application of the \c{length} method. This can be done in the
   Julia REPL (signified by the \texttt{julia>} prefix).
