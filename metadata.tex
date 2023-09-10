@@ -1,19 +1,15 @@
 \author{Artem Pelenitsyn}
-\affiliation{
-  %~ \position{Researcher}
-  %~ \department{Faculty of Information Technologies}              %% \department is recommended
-  \institution{Northeastern University}            %% \institution is required
-  %~ \streetaddress{Street1 Address1}
-  \city{Boston}
-  %~ \state{State1}
-  %~ \postcode{Post-Code1}
-  \country{USA}                    %% \country is recommended
+\orcid{0000-0001-8334-8106}
+\email{pelenitsyn.a@northeastern.edu}
+\affiliation{%
+  \institution{Northeastern University}
+  \city{}
+  \country{USA}
 }
-\email{pelenitsyn.a@northeastern.edu}          %% \email is recommended
 
 \begin{abstract}
 Julia is a dynamic language for scientific computing. For a dynamic language,
-Julia is surprisingly typefull. Types are used not only to structure data but
+Julia is surprisingly typeful. Types are used not only to structure data but
 also to guide dynamic dispatch – the main design tool in the language. No
 matter the dynamism, Julia is performant: flexibility is compiled away at the
 run time using a simple but smart type-specialization based optimization
@@ -22,3 +18,18 @@ from previous works, we present the first algorithm to approximate type
 stability of Julia code. Implementation and evaluation of the algorithm is
 still a work in progress.
 \end{abstract}
+
+\begin{CCSXML}
+<ccs2012>
+<concept>
+<concept_id>10011007.10011006.10011041.10011044</concept_id>
+<concept_desc>Software and its engineering~Just-in-time compilers</concept_desc>
+<concept_significance>500</concept_significance>
+</concept>
+</ccs2012>
+\end{CCSXML}
+
+\ccsdesc[500]{Software and its engineering~Just-in-time compilers}
+
+\keywords{method dispatch, type inference, compilation,%
+  dynamic languages, Julia language}
