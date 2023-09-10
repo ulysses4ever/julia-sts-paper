@@ -31,7 +31,7 @@ On the surface, the Juila language has a lot of pythonistic feeling to it.
 Consider the following function that sums an array of elements but clamps the
 summands above the given threshold.
 %
-\begin{verbatim}
+\begin{lstlisting}
   function sum(v, t)
     res = v[1]
     for i = 2:length(v)
@@ -40,7 +40,7 @@ summands above the given threshold.
     end
     res
   end
-\end{verbatim}
+\end{lstlisting}
 %
 What is striking about this code is the absence of type annotations either on the
 function arguments or anywhere locally. Of course, it is possible to call
@@ -194,7 +194,6 @@ arbitrary Julia code statically, without running the code in question.
 %\section{Approximating Type Stability Statically}\label{chap:approx}
 \section{Inferring Type Stability Versus Inferring Types}%
 \label{sec:arrive}
-% \section{Inferring Types(tability)} ha-ha
 
 A natural idea for inferring type stability in Julia would be to formulate it as
 a forward static analysis: being an abstract or concrete type is one bit of
@@ -203,74 +202,89 @@ propagated to the output, possibly changing on the way.
 
 To test the static analysis idea, consider a positive example first: the
 identity function.
-\begin{verbatim}
+% TODO: there's a weird break in the listing near page break (see PDF)
+\begin{lstlisting}
   function id(x)
     x
   end
-\end{verbatim}
+\end{lstlisting}
 %
 It is straightforward to infer that, given any concrete input type, the return
 value is also concretely typed: the one bit of information carries over to the
 result in one step.
 
-Another example, the increment function, shows that the task becomes unwieldy fast.
+However, another example---the increment function---shows that the task quickly
+becomes unwieldy.
 %
-\begin{verbatim}
+\begin{lstlisting}
   function inc(x)
     x + 1
   end
-\end{verbatim}
+\end{lstlisting}
 %
-Concreteness of the result returned by \c{inc} depends on the same property of
+Concreteness of the result returned by \c{inc} depends on concreteness of
 the result of the call to \c{+}. In turn, the property of the return type of
-\c{+} depends on which \c{+} method Julia will dispatch to at the run time.
-There are about two hundreds method implementations of \c{+} in the standard
+\c{+} depends on which \c{+} method Julia will dispatch to at run time.
+There are about two hundred method implementations of \c{+} in the standard
 library alone, and packages add more. Some of those methods are type stable
-(e.g. \c{+(::Int64,::Int64)}), and some of them not (e.g.
+(e.g. \c{+(::Int64,::Int64)}), and some of them are not (e.g.
 \lstinline|+(::Rational{Bool},::Rational{Bool}|)
-% \footnote{%
-%   The reason for the
-%   \c{+(::Rational\{Bool\},::Rational\{Bool\})} method to be not type
-%   stable is not important, but in the nutshell, Julia has made a questionable
-%   design decision about the return type of \c{{+}(::Bool,::Bool)}, which in the
-%   current implementation is \c{Int}
-%   (see discussion \url{https://github.com/JuliaLang/julia/issues/19168}),
-%   and when adding two rational numbers with boolean components, depending on the
-%   values of the summands, you get back either \c{Rational\{Bool\}} or
-%   \c{Rational\{Int\}}.}
+\footnote{%
+  The reason for the
+  \c{+(::Rational\{Bool\},::Rational\{Bool\})} method to be type
+  unstable is not important, but in a nutshell, Julia has made a questionable
+  design decision about the return type of \c{{+}(::Bool,::Bool)}, which in the
+  current implementation is \c{Int}
+  (see discussion \url{https://github.com/JuliaLang/julia/issues/19168}),
+  and when adding two rational numbers with boolean components, depending on the
+  values of the summands, you get back either \c{Rational\{Bool\}} or
+  \c{Rational\{Int\}}.}
 ).
 Therefore,
 to infer the property of interest, in general,
-we need to predict which methods are selected at the run time.
+we need to predict which methods are selected at run time.
 
 The \c{inc} example shows that inferring type stability of Julia code
 requires
-reasoning about which methods will be called to at the run time, which, in a
-language with dynamic dispatch, leads
-to reasoning about the \emph{types} of intermediate values, rather than only
-the concreteness bit. But if we had a tool to compute typing information
-beforehand, we would not need to build a special purpose analysis for type
-stability: it suffices to ask the tool to tell the type of the return value and
-check if that type is concrete. The observation of interactions between type
-stability and type inference can be formulated as the following conjecture.
+reasoning about %which methods will be called at run time, % repetition of prev sentence
+%which, in a language with dynamic dispatch, leads
+multiple dynamic dispatch, which leads
+to reasoning about the \emph{types} of intermediate values rather than only
+the concreteness bit. But if there was a tool for computing type information
+beforehand, a special-purpose analysis for type stability would not be needed:
+it suffices to ask the tool for the type of the return value and
+check if that type is concrete.
+%The observation of interactions between type
+%stability and type inference can be formulated
+This observation leads to the following conjecture:
 
 \begin{conjecture}
-Inferring type stability of a Julia method statically is no easier than doing type
-inference over that method.
+  Inferring type stability of a Julia method statically is no easier than
+  performing type inference of that method.
 \end{conjecture}
 
-A full type inference algorithm would be enough for checking type stability of
-Julia code. Should we build one from scratch? There are two reasons to do
-otherwise.
+A complete type inference algorithm would allow for checking type stability of
+Julia code. But should type inference be implemented from scratch? There are two reasons to
+not go this way.
 \begin{enumerate}
 
-  \item It is not clear that typing Julia as is can yield any meaningful result
-  (more on this see~\cite{Chung23}).
+  \item It is not clear that inferring types for source-level Julia code
+  %typing Julia
+  without changing anything in the language
+  can yield a meaningful result (more on this see~\cite{Chung23}).
+  For instance, in the \c{inc} example, a sound return type cannot be
+  much better than \c{Any}.
 
-  \item Julia already has a type inference engine built in. It was modeled
-        as a black box in~\cite{Pelenitsyn21}. If we end up with a
-        custom algorithm to infer types and analyze type stability based on it,
-        our results may diverge from Julia's.
+  \item Julia already has a built-in type inference engine, which
+    was modeled as a black box in~\chapref{chap:jules}.
+    This engine is used for code optimizations.
+    Thus, analyzing type stability based on a custom type inference
+    algorithm
+    %to infer types and analyze type stability
+    can produce results that diverge from Julia, misleading the users
+    about potential optimizations.
+    %our results may diverge from Julia's.
+    This would be of limited usage for Julia users.
 \end{enumerate}
 
 \section{An Algorithm To Approximate Type Stability}%
