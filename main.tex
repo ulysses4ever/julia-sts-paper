@@ -291,32 +291,37 @@ not go this way.
 \label{sec:algo}
 
 If our predictions for type stability are to align with the Julia
-implementation, our analysis should closely model what happens at the run time,
+implementation, the analysis should closely model Julia's run-time behavior,
 as described in~\cite{Pelenitsyn21}. The type-specializing JIT-compiler
 from~\cite{Pelenitsyn21} makes optimization decisions based on \emph{concrete
-  input types} with the help of Juila's type inference engine. Our algorithm for
-approximating these decisions statically considers all (or as many as
-possible) allowed concrete input types of a method ---~\figref{fig:infer-ts}.
+  input types} with the help of Juila's type inference engine.
+Therefore, the algorithm for
+predicting these decisions statically considers all (or as many as possible,
+see~\secref{sec:approx:space}) allowed concrete input types of a method.
+\figref{fig:infer-ts} describes this algorithm at a high level.
 
 \input{figs/infer-ts.tex}
 
 Let us consider every step of the algorithm described
-on~\figref{fig:infer-ts} and show its meaning using an example.
-The list below also assigns the numbers to each step in our algorithm.
+on~\figref{fig:infer-ts} and explain its meaning using an example.
+The list below also assigns the numbers to each step in the algorithm.
 \begin{enumerate}
 
   \item The input of the algorithm is a Julia method. Methods in Julia are
-  represented by runtime objects of type \c{Method} and can be manipulated as
+  represented by run-time objects of type \c{Method} and can be manipulated as
   all other objects (e.g. stored in collections, responding to field accesses, etc.).
 
-  For example, consider the \c{length} method from the Julia's standard library. We can
+  For example, consider the \c{length} method from Julia's standard library. We can
   get the corresponding \c{Method} object using the standard \c{@which} macro
   applied to an application of the \c{length} method. This can be done in the
   Julia REPL (signified by the \texttt{julia>} prefix).
-\begin{verbatim}
+
+\begin{minipage}{.92\columnwidth}
+\begin{lstlisting}[style=jterm]
   julia> @which length([1,2,3])
   length(a::Array) in Base at array.jl:215
-\end{verbatim}
+\end{lstlisting}
+\end{minipage}
 
   The output shows that the given \c{length}-call will dispatch to the
   method defined in the \texttt{Base} module (Julia-speak for the standard
@@ -330,65 +335,86 @@ The list below also assigns the numbers to each step in our algorithm.
 
   Building on the example above, we can get the signature of the \c{length}
   method as follows:
-\begin{verbatim}
+
+\begin{minipage}{.92\columnwidth}
+\begin{lstlisting}[style=jterm]
   julia> m = @which length([1,2,3]);
 
   julia> m.sig
   Tuple{typeof(length), Array}
-\end{verbatim}
+\end{lstlisting}
+\end{minipage}
 
-  A signature of a method will usually have the special singleton function
+  A signature of a method
+  contains the special singleton function
   type (\c{typeof(...)}) as the first component, and the rest is (easy to
   convert to) the type of the input --- an $n$-tuple. In this example, the type of
   the input is 1-tuple, consisting of the existential array type
-  \c{Array\{T, N\}\ where T where N} abbreviated simply as \c{Array}.
+  \c{Array\{T, N\}\ where T where N} abbreviated simply as \c{Array}\footnote{%
+A user can always look under the abbreviation using the \c{dump} function.}.
 
-  \item The input type can be either concrete, which, in Julia, means there may
-  be no proper subtypes of that type, or abstract. Still, the choice on the
-  step 3 will enter the loop at least once, because if the input type is
-  concrete, the check holds once trivially (e.g.\ there is exactly one concrete
+  \item The input type can be either concrete, which, in Julia, means that there can
+  be no proper subtypes of that type, or abstract. In either case, the choice on the
+  current step will enter the loop at least once, because for concrete input type,
+  the check holds once trivially (e.g.\ there is exactly one concrete
   subtype of the concrete type \c{Int} --- it is \c{Int} itself).
 
-  If the input type is abstract, we need a subprocess enumerating all concrete
-  subtypes of it. We discuss an implementation for this below but it suffices to
-  treat is as a black box for now. % TODO: ref to subtyping section?
+  If the input type is abstract, we need a procedure enumerating all concrete
+  subtypes of it. An implementation for this procedure is discussed in the next
+  section, but it suffices to treat is as a black box for now.
 
-  In the case of the \c{length} method, the input type, \c{Array}, is abstract
-  because it is an existential type.
+  In the case of the \c{length} method, the input type, \c{Array}, is
+  an existential type and hence abstract. Therefore, the enumeration procedure
+  should have yielded a concrete subtype of \c{Array}. Assume that
+  the concrete type is \c{Array\{Float64, 1\}}.
 
-  \item Running type inference for a given method and a given concrete input
-  type is done through calling the Julia's standard \c{code\_typed} function.
-  The only issue with the function is that it expects a function object as the
+  \item Running Julia's type inference for a given method and a given concrete input
+  type is done by calling Julia's standard \c{code\_typed} function.
+  The only issue with the function is that it expects a function object as a
   part of the input, not a method object. But getting from a method to the
   corresponding function is possible using the signature field discussed above,
-  and, in particular, the singleton function type living in the first component
+  and, in particular, the singleton function type contained in the first component
   of the \c{sig} field: accessing the single function object using the function
   type is possible via the \c{instance} field.
 
   Running type inference for the \c{length} method and the concrete input type
-  \c{Array\{1, Float64\}} could be done as follows:
-% \begin{minipage}{.9\textwidth}
-% \begin{lstlisting}[style=jterm]
-\begin{verbatim}
-  julia> code_typed(m.sig.parameters[1]
-                     .instance,
-                    (Array{1, Float64},),
+  \c{Array\{Float64, 1\}} could be done as shown on \figref{fig:julia-type-infer}.
+  The return value is an array of \c{CodeInfo} objects that represent
+  the type-annotated method bodies of all methods that a call with the given input type
+  could dispatch to (for a concrete input type and no ambiguities in method
+  definitions, the resulting array always contains exactly one element).
+  Method bodies are transformed into
+  a lower-level intermediate representation.
+  In the running example, the
+  method body contains a single call to an intrinsic Julia function that is
+  known to return a value of type \c{Int64}.
+
+  \begin{figure}%[hbt]
+% \begin{minipage}{.92\textwidth}
+% \begin{verbatim}
+\begin{lstlisting}[style=jterm]
+  julia> code_typed(m.sig.parameters[1].instance,
+                    (Array{Float64, 1},),
                     optimize=false)
   1-element Vector{Any}:
-  CodeInfo(
+   CodeInfo(
   1 - %1 = Base.arraylen(a)::Int64
   +--      return %1
   ) => Int64
-\end{verbatim}
-% \end{lstlisting}
+\end{lstlisting}
+    \caption{Running Julia's built-in type inferencer}%
+    \label{fig:julia-type-infer}
+  \end{figure}
+% \end{verbatim}
 % \end{minipage}
 
-  \item In the running example and for the input type \c{Array\{1, Float64\}}
-  the type inferencer is able to deduce that the return type of \c{length}
-  called with the given input type is \c{Int64}, which is a concrete type
-  according to the standard Julia's \c{isconcretetype} predicate.
+  \item Concreteness of the inferred return type is checked
+  with the standard Julia \c{isconcretetype} predicate.
+  In the running example, for the concrete input type \c{Array\{Float64, 1\}},
+  the return type of \c{length} is inferred to be \c{Int64}, which is a concrete type.
   Following the second decision element on \figref{fig:infer-ts}, we get back to
-  the start of the loop and try another concrete subtype of the input type.
+  the start of the loop and try another concrete subtype of the input type,
+  if there is any.
 \end{enumerate}
 
 \section{Implementation}%
