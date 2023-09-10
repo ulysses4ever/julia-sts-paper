@@ -23,7 +23,7 @@ Accordingly, the language market in this area is split into productivity
 languages (Python, MATLAB, R) and high-performance oriented languages (C,
 C++, Fortran).
 
-The splitted nature of the language landscape in the area of scientific
+The split nature of the language landscape in the area of scientific
 computing calls for a question: can we have the best of both worlds? Julia
 attempts to answer in the positive.
 
@@ -42,9 +42,9 @@ summands above the given threshold.
   end
 \end{verbatim}
 %
-What strikes about this code is the absence of type annotations either on the
+What is striking about this code is the absence of type annotations either on the
 function arguments or anywhere locally. Of course, it is possible to call
-\c{sum} with a string and a number and get a runtime failure. On the other hand,
+\c{sum} with a string and a number and get a run-time failure. On the other hand,
 and no less of a surprise, when called with the right arguments the code gets
 JIT-compiled and performs on par with equivalent C code.
 
@@ -59,7 +59,7 @@ dynamic property statically. In particular, we
 \begin{itemize}
 
   \item give an informal description of type stability as it comes up in
-  practice of Julia programming (\secref{sec:back}; largely following~\cite{Pelenitsyn21});
+  the practice of Julia programming (\secref{sec:back}; largely following~\cite{Pelenitsyn21});
 
   \item discuss challenges to model type stability statically and the relation
   of the task to the full-fledged type inference (\secref{sec:arrive});
@@ -108,7 +108,7 @@ like integers) or record types (called structs in Julia). Both bits types and
 record types, referred to as \emph{concrete types}, can have supertypes, but all
 supertypes are \emph{abstract types}. Abstract types are arranged into a
 subtyping hierarchy rooted at the built-in \c{Any} type. Every value in the
-program have a unique type tag that can be accessed via the \c{typeof} funciton.
+program has a unique type tag that can be accessed via the \c{typeof} function.
 %
 The type language allows for further composition of these base
 types using unions, tuples, and bounded existential constructors; the result of
@@ -187,7 +187,7 @@ the return type can be either \c{Int} or \c{Float64}.
 
 \citet{Pelenitsyn21} formalize type stability as it
 relates to program \emph{execution} by building a formal model of a
-type-specializing just-in-time compiler that does its main job at the run time.
+type-specializing just-in-time compiler that does its main job at run time.
 In this work, we set to approximate the property of type stability for
 arbitrary Julia code statically, without running the code in question.
 
