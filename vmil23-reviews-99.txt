@@ -1,0 +1,92 @@
+VMIL '23 Paper #99 Reviews and Comments
+===========================================================================
+Paper #99 Approximating Type Stability in the Julia JIT (work in progress)
+
+
+Review #99A
+===========================================================================
+
+Overall merit
+-------------
+3. Borderline
+
+Reviewer expertise
+------------------
+3. I know the material, but am not an expert
+
+Paper summary
+-------------
+This paper describes preliminary work on statically resolving Julia multiple dispatch.
+
+Comments for authors
+--------------------
+This paper is intriguing, but I'm not sure whether in a good or bad way!
+The paper shows that full static resolution is impossible, that approximations are ultimately equivalent to type-inferencers already used in Julia, and that an initial design doesn't work (in various senses), but proposes to continue the approach because a preliminary implementation sometimes achieves some of the intended effect. The main question is whether a further developed tool be worth using in practice. It's much too soon to say, but exposing the ideas at a workshop and soliciting ideas might be helpful
+
+
+
+Review #99B
+===========================================================================
+
+Overall merit
+-------------
+5. Accept
+
+Reviewer expertise
+------------------
+3. I know the material, but am not an expert
+
+Paper summary
+-------------
+This paper presents an algorithm that can statically approximate the type stability in Julia. This is important because it may allow developers to better reason about the performance of their code (which is dependent on Julia's dynamic exploitation of type stability).
+
+Comments for authors
+--------------------
+This is a nice work-in-progress paper. It is on-topic for VMIL. The subject is important and the paper is well-written.
+
+Beyond these positive comments, I only have low-level feedback on the prose:
+
+* 34 "splitted" -> "split"
+* 49 "What strikes about" -> "What is striking about"
+* 62 "runtime failure" -> "run-time failure"
+* 76 "in practice of" -> "in the practice of"
+* 107 "have" -> "has"
+* 190 "at the run time" -> "at run time" (this is systemic, recurring throughout the paper)
+* 211 "becomes unwieldy fast" -> "quickly becomes unweildly"
+* 266 "step in our ____" (missing word/s)
+* 273 "consider the length from the Julia's" -> "consider length from Julia's"
+* 332 "where N abbreviated" -> "where N, abbreviated"
+* 404 "suptype" -> "subtype"
+* 404"Although, there" -> "Although there"
+* 408 "applying" -> "by applying"
+* 412 "type" -> "the type"
+* 424 "Ben" -> "Benjamin"
+
+
+
+Review #99C
+===========================================================================
+
+Overall merit
+-------------
+2. Weak reject
+
+Reviewer expertise
+------------------
+3. I know the material, but am not an expert
+
+Paper summary
+-------------
+The paper proposes an approach to statically judging type stability in Julia.  It describes the goal and an outline of the proposed algorithm, and discusses an implementation plan.
+
+Comments for authors
+--------------------
+Julia is a widely used language yet not-so-extensively studied.  It would be interesting to understand the language rules in detail, which will give insights to improve the language implementation, and the design of languages other than Julia.
+
+Although the paper describes the idea of judging type stability, it is not clear enough to understand how it can actually work.  While reading Section 4, the reviewer had the following questions:
+
+ - Does it analyze on a per-function/method basis?  If so, how can it know the information of the arguments?  The examples in the paper start analysis from a function call with a concrete argument.  But if it starts from a method/function definition, there would be no information about its arguments.
+
+ - In order to use argument information, an analysis might want to assume calling contexts.  In other words, we might want to perform an inter-procedural analysis.  This paper's approach should be discussed on this regard.
+
+ - The approach seems to extract type information by using Julia's runtime system, which is an interesting idea.  But I wonder how does it exploit information beyond what the Julia runtime provides.
