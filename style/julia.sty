@@ -64,11 +64,11 @@ STDOUT,VERSION,catalan,e,eu,eulergamma,golden,im,nothing,pi,γ,π,φ%
 morekeywords=[3]
 {%
 ANY,AbstractArray,AbstractChannel,AbstractFloat,AbstractMatrix,AbstractRNG,%
-AbstractSerializer,AbstractSet,AbstractSparseArray,AbstractSparseMatrix,%
+AbstractRange,AbstractSerializer,AbstractSet,AbstractSparseArray,AbstractSparseMatrix,%
 AbstractSparseVector,AbstractString,AbstractUnitRange,AbstractVecOrMat,%
 AbstractVector,Any,ArgumentError,Array,AssertionError,Associative,%
 Base64DecodePipe,Base64EncodePipe,Bidiagonal,BigFloat,BigInt,BitArray,%
-BitMatrix,BitVector,Bool,BoundsError,BufferStream,CachingPool,%
+BitMatrix,BitSet,BitVector,Bool,BoundsError,BufferStream,CachingPool,%
 CapturedException,CartesianIndex,CartesianRange,Cchar,Cdouble,Cfloat,Channel,%
 Char,Cint,Cintmax_t,Clong,Clonglong,ClusterManager,Cmd,CodeInfo,Colon,Complex,%
 Complex128,Complex32,Complex64,CompositeException,Condition,ConjArray,%
@@ -374,7 +374,8 @@ morestring=[s]{L"}{"},%
 \newlength{\bfem}
 \settowidth{\bfem}{\lstbasicfont{m}}
 \newlength{\xmrgn}
-\setlength{\xmrgn}{(\textwidth - 80\bfem)*\real{0.1}}
+%\setlength{\xmrgn}{(\textwidth - 80\bfem)*\real{0.1}}
+\setlength{\xmrgn}{0.05\textwidth}
 \lstset{basewidth=\bfem}
 \lstset{linewidth=\textwidth}
 \lstset{xleftmargin=\xmrgn, xrightmargin=\xmrgn}
@@ -382,3 +383,10 @@ morestring=[s]{L"}{"},%
 % activating the julia style
 \lstset{language=julia}
 
+
+\lstdefinestyle{jterm}{
+    basicstyle=\ttfamily\footnotesize\selectfont,
+    moredelim=[is][\bfseries\color{Red}]{a@}{a@},
+    moredelim=[is][\color{MidnightBlue}]{b@}{b@},
+    moredelim=[is][\bfseries\color{OliveGreen}]{`}{`},
+}
