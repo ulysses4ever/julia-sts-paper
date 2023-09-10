@@ -269,21 +269,18 @@ not go this way.
 \begin{enumerate}
 
   \item It is not clear that inferring types for source-level Julia code
-  %typing Julia
   without changing anything in the language
   can yield a meaningful result (more on this see~\cite{Chung23}).
   For instance, in the \c{inc} example, a sound return type cannot be
   much better than \c{Any}.
 
   \item Julia already has a built-in type inference engine, which
-    was modeled as a black box in~\chapref{chap:jules}.
-    This engine is used for code optimizations.
+    is modeled as a black box in~\cite{Pelenitsyn21}.
+    The engine is used for code optimizations.
     Thus, analyzing type stability based on a custom type inference
     algorithm
-    %to infer types and analyze type stability
     can produce results that diverge from Julia, misleading the users
     about potential optimizations.
-    %our results may diverge from Julia's.
     This would be of limited usage for Julia users.
 \end{enumerate}
 
@@ -410,10 +407,12 @@ A user can always look under the abbreviation using the \c{dump} function.}.
 
   \item Concreteness of the inferred return type is checked
   with the standard Julia \c{isconcretetype} predicate.
-  In the running example, for the concrete input type \c{Array\{Float64, 1\}},
-  the return type of \c{length} is inferred to be \c{Int64}, which is a concrete type.
-  Following the second decision element on \figref{fig:infer-ts}, we get back to
-  the start of the loop and try another concrete subtype of the input type,
+  In the running example,
+  the return type of \c{length} is inferred to be \c{Int64}
+  for the concrete input type \c{Array\{Float64, 1\}}.
+  Since \c{Int64} is a concrete type,
+  following the second decision element on \figref{fig:infer-ts}brings us back to
+  the start of the loop. After that, we try another concrete subtype of the input type,
   if there is any.
 \end{enumerate}
 
