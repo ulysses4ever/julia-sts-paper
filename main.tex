@@ -1,12 +1,64 @@
 \documentclass[sigplan,screen]{acmart}
+\usepackage[utf8]{inputenc}
 
+% ********************************************************************
+%
+%        ACM / SIGPLAN Stuff
+%
+% ********************************************************************
+
+%% Copyright information
+%% Supplied to authors (based on authors' rights management selection;
+%% see authors.acm.org) by publisher for camera-ready submission;
+%% use 'none' for review submission.
+%\setcopyright{acmcopyright}
+%\setcopyright{acmlicensed}
+%\setcopyright{rightsretained}
+%\copyrightyear{2017}           %% If different from \acmYear
+%%% If you see 'ACMUNKNOWN' in the 'setcopyright' statement below,
+%%% please first submit your publishing-rights agreement with ACM (follow link on submission page).
+%%% Then please reload our instructions page and copy-and-paste the NEW commands into your article.
+%%% Please contact us in case of questions; allow up to 10 min for the system to propagate the information.
+%%%
+%%% The following is specific to VMIL '23 and the paper
+%%% 'Approximating Type Stability in the Julia JIT'
+%%% by Artem Pelenitsyn.
+%%%
+\copyrightyear{2023}
+\acmYear{2023}
+\setcopyright{acmlicensed}\acmConference[VMIL '23 ]{Proceedings of the 15th
+ACM SIGPLAN International Workshop on Virtual Machines and Intermediate
+Languages }{October 23, 2023}{Cascais, Portugal}
+\acmBooktitle{Proceedings of the 15th ACM SIGPLAN International Workshop on
+Virtual Machines and Intermediate Languages (VMIL '23 ), October 23, 2023,
+Cascais, Portugal}
+\acmPrice{15.00}
+\acmDOI{10.1145/3623507.3623556}
+\acmISBN{979-8-4007-0401-7/23/10}
+
+\acmSubmissionID{splashws23vmilmain-p99-p}
+\received{2023-07-23}
+\received[accepted]{2023-08-28}
+
+
+\bibliographystyle{ACM-Reference-Format}
 \input{preamble}
 \input{macros}
 
+
 \begin{document}
 
-\title[Approximating Type Stability in the Julia JIT (work in progress)]%
-{Approximating Type Stability in the Julia JIT\\(work in progress)}
+\title[Approximating Type Stability in The Julia JIT (work in progress)]%
+{Approximating Type Stability in The Julia JIT\\(work in progress)}
+
+\author{Artem Pelenitsyn}
+\orcid{0000-0001-8334-8106}
+\email{pelenitsyn.a@northeastern.edu}
+\affiliation{%
+  \institution{Northeastern University}
+  \city{}
+  \country{USA}
+}
 
 \input{metadata}
 
@@ -27,7 +79,7 @@ The split nature of the language landscape in the area of scientific
 computing calls for a question: can we have the best of both worlds? Julia
 attempts to answer in the positive.
 
-On the surface, the Juila language has a lot of pythonistic feeling to it.
+On the surface, the Julia language has a lot of pythonistic feeling to it.
 Consider the following function that sums an array of elements but clamps the
 summands above the given threshold.
 %
@@ -42,7 +94,7 @@ summands above the given threshold.
   end
 \end{lstlisting}
 %
-What is striking about this code is the absence of type annotations either on the
+Notice the absence of type annotations either on the
 function arguments or anywhere locally. Of course, it is possible to call
 \c{sum} with a string and a number and get a run-time failure. On the other hand,
 and no less of a surprise, when called with the right arguments the code gets
@@ -70,9 +122,7 @@ dynamic property statically. In particular, we
   evaluation of the algorithm (\secref{sec:eval}) --- both work in progress.
 \end{itemize}
 
-% \section{A Typeful Language in The Untyped Universe}%
 \section{A Type Stability Primer}%
-% \section{Julia: Productivity And Performance Reconciled}
 \label{sec:back}
 
 \subsection{Multiple Dispatch in Julia}%
@@ -291,10 +341,10 @@ If our predictions for type stability are to align with the Julia
 implementation, the analysis should closely model Julia's run-time behavior,
 as described in~\cite{Pelenitsyn21}. The type-specializing JIT-compiler
 from~\cite{Pelenitsyn21} makes optimization decisions based on \emph{concrete
-  input types} with the help of Juila's type inference engine.
+  input types} with the help of Julia's type inference engine.
 Therefore, the algorithm for
-predicting these decisions statically considers all (or as many as possible,
-see~\secref{sec:approx:space}) allowed concrete input types of a method.
+predicting these decisions statically considers all (or as many as possible)
+allowed concrete input types of a method.
 \figref{fig:infer-ts} describes this algorithm at a high level.
 
 \input{figs/infer-ts.tex}
@@ -416,6 +466,7 @@ A user can always look under the abbreviation using the \c{dump} function.}.
   if there is any.
 \end{enumerate}
 
+\balance
 \section{Implementation}%
 \label{sec:impl}
 
@@ -458,6 +509,15 @@ resulting method instances collected from the internal state of the virtual
 machine. We propose to run our algorithm for statically inferring type stability
 over the same packages and match the results.
 
+\section*{Acknowledgements}
+
+Jan Vitek showed me how exciting Julia is and suggested the topic of type
+stability in general and its approximation in particular later on.
+Jan Jecmen joined in building the prototype and brought several deep insights
+(backed by pull requests)
+in how to improve it.
+Julia Belyakova and
+VMIL '23 anonymous reviewers helped to improve the text.
 
 \bibliography{bib/jv,bib/all,bib/lj}
 
